@@ -48,4 +48,5 @@ docker build -t trading_server -f Dockerfileserver .
 - You should be able to see in the terminal the output of the tests
 - It should generate a report.html file in the root directory of the project
 - Every once in a while delete endpoint returns a bad request
-- 
+- In case the docker commands do not work, cd /tests and run the following command: pytest -vs -rf report_log.py  --html-report=./report.html 
+The server is also integrated in the test suite, so you can run the tests without starting the server manually
