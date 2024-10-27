@@ -1,7 +1,8 @@
 # Trading Orders Task
 
 This project is mocking a trading application for managing trading orders with WebSocket functionality. 
-It includes endpoints for creating, retrieving, and canceling orders, as well as a test suite implemented using pytest.
+It includes endpoints for creating, retrieving, and canceling orders, as well as a test suite implemented using pytest, 
+which generates a report.html file with the test results.
 
 ## Project Structure
 
