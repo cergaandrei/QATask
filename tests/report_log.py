@@ -39,8 +39,11 @@ async def websocket_endpoint(websocket: WebSocket):
                 if order:
                     order["status"] = status
                     await manager.broadcast_connections(f"Order {order_id} status changed to {status}")
-    except Exception:
-        manager.disconnect_connections(websocket)
+    except Exception as e:
+        print(f"Exception in WebSocket: {e}")
+    finally:
+        await manager.disconnect_connections(websocket)
+        print("WebSocket connection closed")
 
 def start_server():
     uvicorn.run(app, host="127.0.0.1", port=8000)
@@ -57,6 +60,7 @@ def fastapi_server():
 async def check_server_health():
     async with httpx.AsyncClient() as client:
         response = await client.get("http://127.0.0.1:8000/health")
+        assert response.status_code == 200
 
 @app.get("/health")
 async def health_check():

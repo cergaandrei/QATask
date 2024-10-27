@@ -6,7 +6,7 @@ class Connect_Clients:
         await websocket.accept()
         self.connections.append(websocket)
 
-    def disconnect_connections(self, websocket):
+    async def disconnect_connections(self, websocket):
         self.connections.remove(websocket)
 
     async def broadcast_connections(self, message):
