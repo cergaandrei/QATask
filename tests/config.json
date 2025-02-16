@@ -1,0 +1,15 @@
+{
+    "base_url": "https://magento.softwaretestingboard.com",
+    "user_details": {
+        "default_email": "testuser@example.com",
+        "firstname": "John",
+        "lastname": "Doe",
+        "street": "123 Test Street",
+        "city": "New York",
+        "postcode": "10001",
+        "telephone": "555-123-4567",
+        "region": "California",
+        "country": "United States",
+        "default_shipping_method": "tablerate_bestway"
+    }
+}
