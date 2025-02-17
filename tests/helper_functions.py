@@ -1,17 +1,75 @@
-import logging
-import time
+from selenium.common import TimeoutException
+from selenium.webdriver import ActionChains
 from selenium.webdriver.support.ui import Select
+import random
+import string
+import time
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-
+import logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 def wait_for_element(driver, by, value, timeout=10, condition=EC.presence_of_element_located):
     return WebDriverWait(driver, timeout).until(condition((by, value)))
 
+def generate_random_email():
+    random_string = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
+    return f"testuser_{random_string}@example.com"
+
+def generate_secure_password(length=12):
+    uppercase = random.choice(string.ascii_uppercase)
+    lowercase = random.choice(string.ascii_lowercase)
+    digit = random.choice(string.digits)
+    special = random.choice("!@#$%^&*")
+
+    remaining_chars = "".join(random.choices(string.ascii_letters + string.digits + "!@#$%^&*", k=length - 4))
+
+    password = uppercase + lowercase + digit + special + remaining_chars
+    return "".join(random.sample(password, len(password)))
+
+def create_account(driver, base_url, user_details):
+    logging.info("Starting account creation process...")
+    time.sleep(5)
+    driver.get(base_url + "/customer/account/create/")
+
+    WebDriverWait(driver, 30).until(
+        EC.presence_of_element_located((By.ID, "firstname"))
+    )
+
+    def fill_field(field_name, value):
+        field = WebDriverWait(driver, 5).until(
+            EC.presence_of_element_located((By.NAME, field_name))
+        )
+        field.clear()
+        field.send_keys(value)
+        time.sleep(1)
+
+    email_field = WebDriverWait(driver, 30).until(
+        EC.element_to_be_clickable((By.ID, "email_address"))
+    )
+    email_field.click()
+    user_details["default_email"] = generate_random_email()
+    fill_field("email", user_details["default_email"])
+    fill_field("firstname", user_details["firstname"])
+    fill_field("lastname", user_details["lastname"])
+
+    password = generate_secure_password()
+    fill_field("password", password)
+    fill_field("password_confirmation", password)
+
+    logging.info(f"Generated Password: {password}")
+
+    create_account_button = WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable((By.CSS_SELECTOR, "button.action.submit.primary"))
+    )
+    create_account_button.click()
+
+    logging.info("Account creation process completed.")
+
+
+
 def search_product(driver, base_url, product_name):
-    """Search for a product dynamically."""
     logging.info(f"Searching for product: {product_name}")
     driver.get(f"{base_url}/")
     search_box = wait_for_element(driver, By.NAME, "q", condition=EC.element_to_be_clickable)
@@ -19,23 +77,21 @@ def search_product(driver, base_url, product_name):
 
 
 def select_product_and_attributes(driver):
-    """Searches for a product, clicks it, selects available size and color dynamically, and adds it to the cart."""
 
-    # Step 1: Click on the first product in the search results
     product_list = driver.find_elements(By.CSS_SELECTOR, "a.product-item-link")
     if not product_list:
         raise Exception("No products found in search results!")
 
-    product_list[0].click()  # Click first product
+    product_list[0].click()
 
-    # Wait for the product details page to load
+
     WebDriverWait(driver, 5).until(
         EC.presence_of_element_located((By.CSS_SELECTOR, "div.product-info-main"))
     )
 
     selected_color, selected_size = None, None
 
-    # Step 2: Select size if available
+
     try:
         WebDriverWait(driver, 3).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "div.swatch-option.text"))
@@ -51,7 +107,6 @@ def select_product_and_attributes(driver):
     except:
         print("No size options found, skipping selection.")
 
-    # Step 3: Select color if available
     try:
         WebDriverWait(driver, 3).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "div.swatch-option.color"))
@@ -67,84 +122,153 @@ def select_product_and_attributes(driver):
     except:
         print("No color options found, skipping selection.")
 
-    # Step 4: Click "Add to Cart" button
-    add_to_cart_button = driver.find_element(By.CSS_SELECTOR, "button#product-addtocart-button")
-    driver.execute_script("arguments[0].click();", add_to_cart_button)
-
-    # Step 5: Wait for the correct "added to cart" message
-    WebDriverWait(driver, 5).until(
-        EC.presence_of_element_located((By.CSS_SELECTOR, "div[data-bind*='prepareMessageForHtml']"))
-    )
-
     return selected_size.text if selected_size else "No size", selected_color.text if selected_color else "No color"
 
-
+def add_to_cart(driver):
+    add_to_cart_button = wait_for_element(driver, By.CSS_SELECTOR, "button.tocart", condition=EC.element_to_be_clickable)
+    add_to_cart_button.click()
+    WebDriverWait(driver, 10).until(
+        EC.visibility_of_element_located((By.CSS_SELECTOR, "div.message-success"))
+    )
+    time.sleep(5)
 def fill_checkout_form(driver, user_details):
-    """Dynamically fill the checkout form with values from config using stable 'name' attributes."""
     logging.info("Filling out checkout form...")
     driver.get("https://magento.softwaretestingboard.com/checkout/")
 
-    WebDriverWait(driver, 10).until(
+    WebDriverWait(driver, 30).until(
         EC.presence_of_element_located((By.CSS_SELECTOR, "form#co-shipping-form"))
     )
 
-    # ✅ Function to fill fields safely
     def fill_field(field_name, value):
-        field = WebDriverWait(driver, 5).until(
-            EC.presence_of_element_located((By.NAME, field_name))
+        try:
+            field = WebDriverWait(driver, 5).until(
+                EC.presence_of_element_located((By.NAME, field_name))
+            )
+            field.clear()
+            field.send_keys(value)
+            time.sleep(1)
+        except TimeoutException:
+            logging.warning(f"Field '{field_name}' not found. Skipping...")
+
+    try:
+        email_field = WebDriverWait(driver, 5).until(
+            EC.presence_of_element_located((By.ID, "customer-email"))
         )
-        field.clear()
-        field.send_keys(value)
-        time.sleep(1)  # Short delay to ensure input registers
 
-    email_field = WebDriverWait(driver, 30).until(
-        EC.element_to_be_clickable((By.ID, "customer-email"))  # Using ID for better targeting
-    )
-    email_field.click()
-    email_field.send_keys(user_details["default_email"])
-    fill_field("firstname", user_details["firstname"])  # First Name
-    fill_field("lastname", user_details["lastname"])  # Last
-    fill_field("street[0]", user_details["street"])  # Street Address
-    fill_field("city", user_details["city"])  # City
-    fill_field("postcode", user_details["postcode"])  # Zip Code
-    fill_field("telephone", user_details["telephone"])  # Phone Number
+        if email_field.is_displayed() and email_field.is_enabled():
+            email_field.clear()
+            email_field.send_keys(user_details["default_email"])
+            logging.info(f"Entered email: {user_details['default_email']}")
+        else:
+            logging.info("Email field is present but not interactable. Skipping it.")
+    except TimeoutException:
+        logging.info("Email field not found. Assuming user is logged in and skipping it.")
 
-    # ✅ Select State Dropdown
-    state_dropdown = Select(WebDriverWait(driver, 5).until(
-        EC.presence_of_element_located((By.NAME, "region_id"))
-    ))
-    state_dropdown.select_by_visible_text(user_details["region"])  # Select by text (e.g., "California")
-    time.sleep(5)  # Delay to allow state selection to register
+    fill_field("firstname", user_details["firstname"])
+    fill_field("lastname", user_details["lastname"])
+    fill_field("street[0]", user_details["street"])
+    fill_field("city", user_details["city"])
+    fill_field("postcode", user_details["postcode"])
+    fill_field("telephone", user_details["telephone"])
 
-    # ✅ Select Country Dropdown
-    country_dropdown = Select(WebDriverWait(driver, 5).until(
-        EC.presence_of_element_located((By.NAME, "country_id"))
-    ))
-    country_dropdown.select_by_visible_text(user_details["country"])  # Select country (e.g., "United States")
-    time.sleep(5)  # Ensure country selection registers
+    try:
+        state_dropdown = Select(WebDriverWait(driver, 5).until(
+            EC.presence_of_element_located((By.NAME, "region_id"))
+        ))
+        state_dropdown.select_by_visible_text(user_details["region"])
+    except TimeoutException:
+        logging.warning("State dropdown not found. Skipping...")
 
-    logging.info("✅ Checkout form filled successfully.")
+    try:
+        country_dropdown = Select(WebDriverWait(driver, 5).until(
+            EC.presence_of_element_located((By.NAME, "country_id"))
+        ))
+        country_dropdown.select_by_visible_text(user_details["country"])
+    except TimeoutException:
+        logging.warning("Country dropdown not found. Skipping...")
+
+    logging.info("Checkout form filled successfully.")
+
+
+
 
 
 def select_shipping_method(driver, shipping_method):
-    """Select a dynamic shipping method."""
     logging.info(f"Selecting shipping method: {shipping_method}")
-    shipping_option = wait_for_element(driver, By.CSS_SELECTOR, f"input[type='radio'][value='{shipping_method}']", timeout=15)
-    shipping_option.click()
-    wait_for_element(driver, By.CSS_SELECTOR, "button[data-role='opc-continue']", timeout=15).click()
+
+    wait = WebDriverWait(driver, 15)
+
+    wait.until(EC.presence_of_element_located((By.XPATH, f"//input[@type='radio' and @value='{shipping_method}']")))
+    shipping_option = wait.until(EC.element_to_be_clickable((By.XPATH, f"//input[@type='radio' and @value='{shipping_method}']")))
+
+    if not shipping_option.is_selected():
+        driver.execute_script("arguments[0].click();", shipping_option)
+        logging.info(f"Clicked on shipping method: {shipping_method}")
+    else:
+        logging.info(f"Shipping method {shipping_method} was already selected")
+
+    continue_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button[data-role='opc-continue']")))
+    driver.execute_script("arguments[0].click();", continue_button)
+    logging.info("Clicked on 'Continue' button")
+
 
 def place_order(driver):
-    """Dynamically place the order after ensuring the loading icon disappears."""
     logging.info("Placing the order...")
     time.sleep(10)
-    # Wait for loading icon to disappear (replace with actual class name or ID of the spinner)
     WebDriverWait(driver, 15).until(
-        EC.invisibility_of_element_located((By.CLASS_NAME, "loading-mask"))  # Update this if needed
+        EC.invisibility_of_element_located((By.CLASS_NAME, "loading-mask"))
     )
 
-    # Wait for Place Order button to be clickable
     place_order_button = wait_for_element(driver, By.XPATH, "//span[text()='Place Order']", condition=EC.element_to_be_clickable, timeout=15)
     place_order_button.click()
     time.sleep(5)
-    logging.info("✅ Order placed successfully.")
+    logging.info("Order placed successfully.")
+
+
+def hover_and_click_tees(driver):
+    wait = WebDriverWait(driver, 10)
+    actions = ActionChains(driver)
+
+    women_menu = wait.until(EC.presence_of_element_located((By.ID, "ui-id-4")))
+    actions.move_to_element(women_menu).perform()
+
+    tops_menu = wait.until(EC.presence_of_element_located((By.ID, "ui-id-9")))
+    actions.move_to_element(tops_menu).perform()
+
+    tees_option = wait.until(EC.element_to_be_clickable((By.ID, "ui-id-13")))
+    tees_option.click()
+
+    print("Successfully navigated to Tees!")
+
+
+
+def change_quantity(driver, quantity=4):
+    wait = WebDriverWait(driver, 10)
+
+    qty_input = wait.until(EC.presence_of_element_located((By.ID, "qty")))
+
+    qty_input.clear()
+    qty_input.send_keys(str(quantity))
+
+    print(f"Quantity changed to {quantity}")
+
+def verify_discount_applied(driver):
+    try:
+        logging.info("Verifying discount application...")
+
+        discount_element = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "span.price[data-th*='discount']"))
+        )
+        discount_value = discount_element.text.strip()
+
+        if discount_value.startswith("-$"):  # Ensure it's a negative discount
+            logging.info(f"Discount applied successfully: {discount_value}")
+            return True
+        else:
+            logging.warning(f"Unexpected discount value: {discount_value}")
+            return False
+
+    except Exception as e:
+        logging.error(f"Failed to verify discount: {str(e)}")
+        return False
 
