@@ -19,8 +19,6 @@ adăugarea în coș, aplicarea reducerilor și finalizarea comenzii.
 
 ## Pasii pentru rulare
 
-Follow these steps to set up and run the project locally:
-
 1. **Clonează repository-ul pe mașina locală:**
 
 
